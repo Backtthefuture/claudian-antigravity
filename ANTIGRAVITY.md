@@ -1,0 +1,63 @@
+# Antigravity preview
+
+This local patch adds one optional provider to Claudian 2.2.7 (`8fc1f920bf98c39d1c1499509684dc2526ba65bc`). It uses the installed `agy` CLI and its existing authentication. It does not implement another agent loop or copy native Skills into Claudian.
+
+## Setup
+
+1. Install and sign in to the official Antigravity CLI. Verify `agy models` and `agy -p /skills --output-format json` in a terminal.
+2. Install this build in a separate desktop Obsidian vault first. The plugin ID remains `realclaudian`; it replaces, rather than coexists with, upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Community or BRAT updates can overwrite the local patch.
+3. Open **Claudian → Providers → Antigravity**, enable it, and set the absolute `agy` executable path if discovery cannot find it.
+4. Discover models, then select the models to show in chat. Discovery never enables models automatically. Model aliases and ordering use Claudian's existing controls.
+5. Start a new conversation and choose an Antigravity model. Type `/` to browse native Skills. Use **Escape** in the input to stop a running answer.
+
+Proxy variables belong in Claudian's shared/provider environment settings only when the local network needs them. Start with the same environment that works in a terminal. A Google eligibility `EOF` can occur before the agent starts; the provider surfaces that error and supports a fresh retry. This patch does not refresh credentials or change network policy.
+
+## Three maintenance areas
+
+| Area | Files under `src/providers/antigravity/` | Contract |
+| --- | --- | --- |
+| Execution | `AntigravityExecutionBackend.ts`, `AntigravityProcess.ts`, `AntigravityHistory.ts` | Structured streaming, bounded process cleanup, cancellation, explicit conversation IDs, provider-owned display cache |
+| Models | `AntigravityMetadata.ts`, `AntigravityChatUIConfig.ts`, `AntigravitySettingsTab.ts`, `settings.ts` | Native `agy models`, namespaced model IDs, explicit model selection |
+| Skills | `AntigravityMetadata.ts`, `AntigravityWorkspace.ts` | Native `agy -p /skills --output-format json`, read-only command discovery, leading slash passed unchanged to agy |
+
+The only upstream production entry files changed are `src/providers/index.ts` and `src/providers/defaultProviderConfigs.ts`. `ProviderModuleCatalog.test.ts` also includes the new optional provider. Shared chat UI and execution contracts are unchanged.
+
+## Continuation and limits
+
+- Each conversation saves its own native ID and resumes using `--conversation ID`. The adapter never uses global `--continue` or guesses the latest CLI session.
+- Text history is stored as a provider-owned display snapshot in Claudian metadata. Native context remains in agy's own session. The patch does not read, modify, or delete private agy databases. Detailed tool cards are not reconstructed after reloading, and an existing CLI conversation cannot be imported through the history UI.
+- agy 1.2.4 has no documented system-prompt override flag. Complete Claudian instructions are appended as labeled application context after the user input, preserving native slash invocation. This is not a system-role override.
+- Native headless permissions apply. Interactive approval dialogs, image attachments, forks, rewind, steering, native usage accounting, and inline edit are outside this preview. Restricted auxiliary tool policies are rejected rather than silently weakened. Automatic title generation through Antigravity is therefore unavailable; disable it or use a supported provider.
+- Native Skills remain read-only in Claudian. Edit their original folders, then reopen chat for discovery. No global Skill links or CLI permissions are modified by installation.
+- Verified on macOS with Obsidian 1.13.7 and agy 1.2.4. Windows/Linux are not manually verified.
+
+## Checks
+
+Use Node 24 and the upstream dependency lockfile:
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
+
+Do not set `.env.local` to a production vault during development; upstream build scripts can copy bundles to configured destinations.
+
+The default suite runs subprocess fixtures without network access. The opt-in live test creates two fictional native conversations and verifies independent continuation after backend recreation. It requires an authenticated CLI and uses provider quota:
+
+```bash
+CLAUDIAN_AGY_LIVE_TEST=1 \
+CLAUDIAN_AGY_TEST_VAULT=/absolute/path/to/isolated-test-vault \
+CLAUDIAN_AGY_TEST_CLI=/absolute/path/to/agy \
+npx jest --runInBand --runTestsByPath tests/integration/providers/antigravity/AntigravityLive.test.ts
+```
+
+An optional `CLAUDIAN_AGY_TEST_ENV` supplies explicit CLI environment overrides. No proxy is assumed by the test. Manual acceptance covers model discovery and selection, native Skill completion, visible streaming, Escape cancellation, and reopening a saved conversation after reloading the plugin.
+
+## Upstream updates
+
+Keep `upstream` pointing at [YishenTu/claudian](https://github.com/YishenTu/claudian). For each selected release, create a separate update branch/worktree from this integration branch, merge the verified release tag there, inspect the two registration entry points and provider contract changes, and run all checks above. Re-run the live test and manual acceptance in the isolated vault before replacing a working bundle. Keep the previous installation files for rollback. Do not automatically pull development `main` into the installed plugin.
+
+Protocol references: [headless mode](https://www.antigravity.google/docs/cli/headless/) and [CLI reference](https://www.antigravity.google/docs/cli/reference/).

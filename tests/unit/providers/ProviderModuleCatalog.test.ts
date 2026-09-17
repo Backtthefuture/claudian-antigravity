@@ -18,6 +18,7 @@ describe('built-in ProviderModule catalog', () => {
       'grok',
       'opencode',
       'pi',
+      'antigravity',
     ]);
     for (const module of BUILT_IN_PROVIDER_MODULES) {
       expect(module.workspace.initialize).toEqual(expect.any(Function));
@@ -65,6 +66,7 @@ describe('built-in ProviderModule catalog', () => {
       grok: false,
       opencode: false,
       pi: false,
+      antigravity: false,
     };
 
     for (const module of BUILT_IN_PROVIDER_MODULES) {
