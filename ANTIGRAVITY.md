@@ -1,11 +1,11 @@
 # Antigravity preview
 
-This local patch adds one optional provider to Claudian 2.2.7 (`8fc1f920bf98c39d1c1499509684dc2526ba65bc`). It uses the installed `agy` CLI and its existing authentication. It does not implement another agent loop or copy native Skills into Claudian.
+This fork adds one optional provider to Claudian 2.2.7 (`8fc1f920bf98c39d1c1499509684dc2526ba65bc`). It uses the installed `agy` CLI and its existing authentication. It preserves Claudian's interface and existing providers rather than replacing them. It does not implement another agent loop or copy native Skills into Claudian.
 
 ## Setup
 
 1. Install and sign in to the official Antigravity CLI. Verify `agy models` and `agy -p /skills --output-format json` in a terminal.
-2. Install this build in a separate desktop Obsidian vault first. The plugin ID remains `realclaudian`; it replaces, rather than coexists with, upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Community or BRAT updates can overwrite the local patch.
+2. Install BRAT from Obsidian's community plugins. In BRAT, choose **Add a beta plugin**, enter `Backtthefuture/claudian-antigravity`, and select `2.2.7-antigravity.1` or a later verified release. Start with a separate desktop vault. The plugin ID remains `realclaudian`; this updates upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Use this fork's BRAT entry for future updates; community-market updates or a BRAT entry tracking upstream can overwrite the patch.
 3. Open **Claudian → Providers → Antigravity**, enable it, and set the absolute `agy` executable path if discovery cannot find it.
 4. Discover models, then select the models to show in chat. Discovery never enables models automatically. Model aliases and ordering use Claudian's existing controls.
 5. Start a new conversation and choose an Antigravity model. Type `/` to browse native Skills. Use **Escape** in the input to stop a running answer.
@@ -58,6 +58,12 @@ An optional `CLAUDIAN_AGY_TEST_ENV` supplies explicit CLI environment overrides.
 
 ## Upstream updates
 
-Keep `upstream` pointing at [YishenTu/claudian](https://github.com/YishenTu/claudian). For each selected release, create a separate update branch/worktree from this integration branch, merge the verified release tag there, inspect the two registration entry points and provider contract changes, and run all checks above. Re-run the live test and manual acceptance in the isolated vault before replacing a working bundle. Keep the previous installation files for rollback. Do not automatically pull development `main` into the installed plugin.
+Keep `upstream` pointing at [YishenTu/claudian](https://github.com/YishenTu/claudian) and `origin` at [Backtthefuture/claudian-antigravity](https://github.com/Backtthefuture/claudian-antigravity). The maintained branch is `antigravity-integration`. For each selected release, create a separate update branch/worktree from this integration branch, merge the verified release tag there, inspect the two registration entry points and provider contract changes, and run all checks above. Re-run the live test and manual acceptance in the isolated vault before replacing a working bundle. Keep the previous installation files for rollback. Do not automatically pull development `main` into the installed plugin.
+
+## Publishing for BRAT
+
+Release versions use the upstream base plus an Antigravity prerelease suffix, starting at `2.2.7-antigravity.1`. Keep `package.json`, the root package in `package-lock.json`, `manifest.json`, and the release tag aligned. Add the minimum supported Obsidian version to `versions.json`.
+
+Push the verified integration commit and a matching version tag to `origin`. The upstream Release workflow runs CI and builds the plugin on GitHub, then creates a **draft** release with `main.js`, `manifest.json`, and `styles.css` as individual assets. Download and validate those assets before publishing the draft as a prerelease. BRAT can install a selected prerelease; a ZIP alone is not the BRAT installation interface. Do not publish a failed or incomplete workflow result.
 
 Protocol references: [headless mode](https://www.antigravity.google/docs/cli/headless/) and [CLI reference](https://www.antigravity.google/docs/cli/reference/).
