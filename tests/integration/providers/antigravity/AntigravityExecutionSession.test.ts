@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { ProviderExecutionEvent, ProviderExecutionRequest, ProviderSessionConfig } from '@/core/execution';
+import { buildSystemPrompt } from '@/core/prompt/mainAgent';
 import type { ProviderHost } from '@/core/providers/ProviderHost';
 import { AntigravityExecutionBackend } from '@/providers/antigravity/AntigravityExecutionBackend';
 
@@ -35,6 +36,7 @@ const prompt = a[a.indexOf('-p') + 1];
 const id = a.includes('--conversation') ? a[a.indexOf('--conversation') + 1] : 'new-session';
 const emit = x => process.stdout.write(JSON.stringify(x) + '\\n');
 if (a.includes('--continue') || a.includes('--dangerously-skip-permissions')) process.exit(9);
+if (prompt.startsWith('capture-prompt')) { emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:prompt}}); process.exit(0); }
 if (prompt.startsWith('network-error')) { process.stderr.write('Eligibility check failed: EOF'); process.exit(1); }
 if (prompt.startsWith('rejected')) { emit({event:'result',result:{status:'ERROR',error:'Unknown model'}}); process.exit(1); }
 if (prompt.startsWith('mismatch')) { emit({event:'init',conversation_id:'unexpected-session'}); process.exit(0); }
@@ -93,6 +95,23 @@ else if (prompt.startsWith('denied')) {
     expect(events.some(e => e.type === 'notice' && /denied/i.test(e.message))).toBe(true);
     expect(events.at(-1)?.type).toBe('execution_error');
     expect(events).toContainEqual(expect.objectContaining({ type: 'tool_completed', isError: true, content: 'permission check failed for write_file' }));
+    await session.dispose();
+  });
+
+  it('supplies fresh host time and native tool limits while preserving the complete shared prompt', async () => {
+    host.settings.systemPrompt = 'Keep my custom instructions.';
+    const session = backend.createSession(config());
+    const query = request('capture-prompt');
+    const events = await collect(session.execute({
+      ...query,
+      configuration: { ...query.configuration, systemInstructions: { kind: 'provider-default', dynamicSections: ['Keep the dynamic section.'] } },
+    }).events);
+    const text = events.flatMap(e => e.type === 'text_delta' ? [e.text] : []).join('');
+    expect(text).toContain(buildSystemPrompt({ vaultPath: root, customPrompt: 'Keep my custom instructions.' }, { dynamicSections: ['Keep the dynamic section.'] }));
+    expect(text).toMatch(/Host current time: \d{4}-\d{2}-\d{2}T/);
+    expect(text).toContain('Interactive approvals are unavailable');
+    expect(text).toContain('find_by_name');
+    expect(text).toContain('grep_search');
     await session.dispose();
   });
 

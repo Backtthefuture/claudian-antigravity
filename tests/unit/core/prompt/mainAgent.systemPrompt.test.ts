@@ -65,7 +65,8 @@ describe('systemPrompt', () => {
 
     it('should include base system prompt elements', () => {
       const prompt = buildSystemPrompt();
-      expect(prompt).toContain('Use `bash: date` to get the current date and time. Never guess or assume.');
+      expect(prompt).toContain('Prefer the current date and time supplied by the host or native runtime.');
+      expect(prompt).toContain('Use `bash: date` only when time is needed, no runtime time is available, and command execution is permitted.');
       expect(prompt).not.toContain('## Current Date');
       expect(prompt).toContain('Claudian');
       expect(prompt).toContain('## Path Conventions');
@@ -83,6 +84,13 @@ describe('systemPrompt', () => {
       );
       expect(prompt).not.toContain('You always use relative paths.');
       expect(prompt).not.toContain('A leading slash or absolute path will FAIL');
+    });
+
+    it('supports note linking without requiring terminal access', () => {
+      const prompt = buildSystemPrompt({ vaultPath: '/vault' });
+      expect(prompt).toContain('Creating or updating wikilinks in Markdown does not require the Obsidian CLI.');
+      expect(prompt).toContain('When the Obsidian CLI is available and command execution is permitted');
+      expect(prompt).toContain('Do not claim live backlink resolution from a filesystem search.');
     });
 
     it('should document only current live context shapes', () => {

@@ -171,5 +171,13 @@ function buildPrompt(request: ProviderExecutionRequest, host: ProviderHost, vaul
   const system = instructions.kind === 'explicit' ? instructions.instructions : buildSystemPrompt({
     vaultPath, customPrompt: host.settings.systemPrompt, mediaFolder: host.settings.mediaFolder, userName: host.settings.userName,
   }, { dynamicSections: instructions.dynamicSections ? [...instructions.dynamicSections] : undefined });
-  return `${text}\n\n<claudian_application_context>\n${system}\n</claudian_application_context>`;
+  const now = new Date();
+  const runtime = instructions.kind === 'explicit' ? '' : `\n\n<antigravity_runtime_context>
+Host current time: ${now.toISOString()} (UTC). Host local time: ${now.toString()}.
+Current vault root: ${vaultPath}. For current-vault tasks, resolve note paths inside this directory; do not search the home directory or other repositories for a replacement vault or CLI installation.
+This turn runs through Antigravity headless mode. Interactive approvals are unavailable; terminal commands require existing native permission rules.
+For ordinary vault note discovery, reading, editing, and wikilink tasks, use native filesystem tools such as list_dir, find_by_name, grep_search, view_file, replace_file_content, multi_replace_file_content, and write_to_file. Do not invoke run_command for these tasks, including preliminary checks with date, ls, pwd, find, grep, or the Obsidian CLI. Use list_dir for directory and file existence checks. The host time above is already verified; no clock command is needed.
+If a task genuinely requires an unapproved command or live Obsidian operation, explain the required operation and the limitation. Do not bypass a denial or claim the operation succeeded.
+</antigravity_runtime_context>`;
+  return `${text}\n\n<claudian_application_context>\n${system}\n</claudian_application_context>${runtime}`;
 }

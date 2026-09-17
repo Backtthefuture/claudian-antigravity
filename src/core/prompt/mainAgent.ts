@@ -21,7 +21,7 @@ function getRuntimeContext(
   if (vaultPath) {
     lines.push(`Vault absolute path: ${vaultPath}`);
   }
-  lines.push('Use `bash: date` to get the current date and time. Never guess or assume.');
+  lines.push('Prefer the current date and time supplied by the host or native runtime. Use `bash: date` only when time is needed, no runtime time is available, and command execution is permitted. Never guess or assume.');
 
   return `## Runtime Context
 
@@ -59,8 +59,9 @@ function getFileOperations(): string {
   return `## File Operations
 
 - Use built-in filesystem tools for ordinary reads, edits, file creation, directory creation, listing, and text search.
-- Use the Obsidian CLI for resolved link and backlink queries, indexed tags and tasks, and live app state that filesystem tools cannot reliably provide.
-- For targeted frontmatter property updates, prefer the Obsidian CLI's \`property:set\` and \`property:remove\` commands so Obsidian handles YAML serialization.
+- Creating or updating wikilinks in Markdown does not require the Obsidian CLI. Use built-in search and read tools to find relevant notes and verify their exact paths, then edit the requested note with built-in file tools. Do not claim live backlink resolution from a filesystem search.
+- When the Obsidian CLI is available and command execution is permitted, use it for resolved link and backlink queries, indexed tags and tasks, and live app state that filesystem tools cannot reliably provide. Otherwise, report any live-app capability needed by the task as unavailable.
+- For targeted frontmatter property updates, prefer the Obsidian CLI's \`property:set\` and \`property:remove\` commands when available and permitted so Obsidian handles YAML serialization; otherwise use a careful built-in file edit that preserves valid YAML.
 - Move or rename Vault notes, attachments, and folders through the running Obsidian app so Obsidian can update links according to the user's link-update settings. Do not use shell \`mv\`, filesystem rename APIs, or copy-and-delete followed by manual link replacements.
 - Use the Obsidian CLI for file moves and renames: \`obsidian vault="Vault Name" move path="folder/old.md" to="folder/new.md"\`. Supply the actual current Vault name and exact Vault-relative source and destination paths, including the file extension; do not rely on the active note or a fuzzy \`file=\` match.
 - For folder moves and renames, use \`obsidian vault="Vault Name" eval code="..."\` to resolve the source with \`app.vault.getAbstractFileByPath(sourcePath)\` and await \`app.fileManager.renameFile(folder, destinationPath)\`. Use Vault-relative paths, confirm the source is a folder, and check that the destination does not already exist. Do not use \`app.vault.rename\`, which bypasses FileManager's link updates.
