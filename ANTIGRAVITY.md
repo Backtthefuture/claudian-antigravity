@@ -5,7 +5,7 @@ This fork adds one optional provider to Claudian 2.2.7 (`8fc1f920bf98c39d1c14995
 ## Setup
 
 1. Install and sign in to the official Antigravity CLI. Verify `agy models` and `agy -p /skills --output-format json` in a terminal.
-2. Install BRAT from Obsidian's community plugins. In BRAT, choose **Add a beta plugin**, enter `Backtthefuture/claudian-antigravity`, and select `2.2.7-antigravity.1` or a later verified release. Start with a separate desktop vault. The plugin ID remains `realclaudian`; this updates upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Use this fork's BRAT entry for future updates; community-market updates or a BRAT entry tracking upstream can overwrite the patch.
+2. Install BRAT from Obsidian's community plugins. In BRAT, choose **Add a beta plugin**, enter `Backtthefuture/claudian-antigravity`, and select `2.2.7-antigravity.2` or a later verified release. Start with a separate desktop vault. The plugin ID remains `realclaudian`; this updates upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Use this fork's BRAT entry for future updates; community-market updates or a BRAT entry tracking upstream can overwrite the patch.
 3. Open **Claudian → Providers → Antigravity**, enable it, and set the absolute `agy` executable path if discovery cannot find it.
 4. Discover models, then select the models to show in chat. Discovery never enables models automatically. Model aliases and ordering use Claudian's existing controls.
 5. Start a new conversation and choose an Antigravity model. Type `/` to browse native Skills. Use **Escape** in the input to stop a running answer.
@@ -27,7 +27,8 @@ The only upstream production entry files changed are `src/providers/index.ts` an
 - Each conversation saves its own native ID and resumes using `--conversation ID`. The adapter never uses global `--continue` or guesses the latest CLI session.
 - Text history is stored as a provider-owned display snapshot in Claudian metadata. Native context remains in agy's own session. The patch does not read, modify, or delete private agy databases. Detailed tool cards are not reconstructed after reloading, and an existing CLI conversation cannot be imported through the history UI.
 - agy 1.2.4 has no documented system-prompt override flag. Complete Claudian instructions are appended as labeled application context after the user input, preserving native slash invocation. This is not a system-role override.
-- Native headless permissions apply. Interactive approval dialogs, image attachments, forks, rewind, steering, native usage accounting, and inline edit are outside this preview. Restricted auxiliary tool policies are rejected rather than silently weakened. Automatic title generation through Antigravity is therefore unavailable; disable it or use a supported provider.
+- Chat turns use native `--mode accept-edits` with the current vault as the working directory, including resumed conversations. This lets each vault create and edit its own files without an unavailable interactive diff review. Native permission rules still apply to commands and access outside the vault. The provider does not pass `--dangerously-skip-permissions` or modify global CLI permission settings. Explicit native permission restrictions can still block an operation.
+- Interactive approval dialogs, image attachments, forks, rewind, steering, native usage accounting, and inline edit are outside this preview. Restricted auxiliary tool policies are rejected rather than silently weakened. Automatic title generation through Antigravity is therefore unavailable; disable it or use a supported provider.
 - Native Skills remain read-only in Claudian. Edit their original folders, then reopen chat for discovery. No global Skill links or CLI permissions are modified by installation.
 - Verified on macOS with Obsidian 1.13.7 and agy 1.2.4. Windows/Linux are not manually verified.
 
@@ -55,6 +56,15 @@ npx jest --runInBand --runTestsByPath tests/integration/providers/antigravity/An
 ```
 
 An optional `CLAUDIAN_AGY_TEST_ENV` supplies explicit CLI environment overrides. No proxy is assumed by the test. Manual acceptance covers model discovery and selection, native Skill completion, visible streaming, Escape cancellation, and reopening a saved conversation after reloading the plugin.
+
+The separate opt-in write-permission test creates two temporary vault directories under `CLAUDIAN_AGY_TEST_VAULT`, verifies file creation and edits after native session restoration, then checks that writes outside the active vault and an unapproved shell command remain denied. It deletes only its own temporary files. Run it in an isolated directory that has no pre-existing native allow rules for the parent, and leave shell approval at its default:
+
+```bash
+CLAUDIAN_AGY_LIVE_WRITE_TEST=1 \
+CLAUDIAN_AGY_TEST_VAULT=/absolute/path/to/isolated-test-parent \
+CLAUDIAN_AGY_TEST_CLI=/absolute/path/to/agy \
+npx jest --runInBand --runTestsByPath tests/integration/providers/antigravity/AntigravityFilePermissionsLive.test.ts
+```
 
 ## Upstream updates
 

@@ -71,7 +71,7 @@ class AntigravityExecutionSession implements ProviderExecutionSession {
       if (request.input.some(block => block.type === 'image')) throw new Error('Antigravity image attachments are not supported');
       const model = request.configuration.model;
       if (!model?.startsWith('antigravity:') || !model.slice(12)) throw new Error('Select an enabled Antigravity model first');
-      const args = ['-p', buildPrompt(request, this.host, this.config.vaultWorkingDirectory), '--output-format', 'stream-json', '--model', model.slice(12)];
+      const args = ['-p', buildPrompt(request, this.host, this.config.vaultWorkingDirectory), '--output-format', 'stream-json', '--model', model.slice(12), '--mode', 'accept-edits'];
       if (this.nativeId) args.push('--conversation', this.nativeId);
       active.proc = await createAntigravityProcess(this.host, this.config.vaultWorkingDirectory, args);
       if (request.signal.aborted || active.controller.signal.aborted) throw new Error('Cancelled');
@@ -117,9 +117,9 @@ class AntigravityExecutionSession implements ProviderExecutionSession {
               tools.add(toolCallId);
               yield event({ type: 'tool_started', ...identity, name: string(info.name) || string(step.tool_name) || 'tool', input: record(info.parameters) });
             }
-            if (step.state === 'DONE') {
+            if (step.state === 'DONE' || step.state === 'ERROR') {
               const error = record(info.error);
-              yield event({ type: 'tool_completed', ...identity, content: string(info.output) || string(error.message), isError: !!info.error });
+              yield event({ type: 'tool_completed', ...identity, content: string(info.output) || string(error.message), isError: step.state === 'ERROR' || !!info.error });
             }
           }
         }

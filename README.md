@@ -4,7 +4,7 @@
 >
 > This repository keeps Claudian's existing interface and providers and adds optional Antigravity CLI support. It is based on [YishenTu/claudian 2.2.7](https://github.com/YishenTu/claudian/tree/2.2.7); the upstream MIT license and attribution are preserved. The plugin name and ID remain **Claudian** / **realclaudian**.
 >
-> **通过 BRAT 安装增强版：** 在 Obsidian 中安装并启用 BRAT，选择 **Add a beta plugin**，填入 `Backtthefuture/claudian-antigravity`，选择发布版本 `2.2.7-antigravity.1`，然后安装并启用 Claudian。已有 Claudian 的库会更新同一个插件；首次替换前请备份插件目录和 `.claudian/`。
+> **通过 BRAT 安装增强版：** 在 Obsidian 中安装并启用 BRAT，选择 **Add a beta plugin**，填入 `Backtthefuture/claudian-antigravity`，选择发布版本 `2.2.7-antigravity.2`，然后安装并启用 Claudian。已有 Claudian 的库会更新同一个插件；首次替换前请备份插件目录和 `.claudian/`。
 >
 > 设置 → **Claudian → Providers → Antigravity**：开启，填写已登录的 `agy` CLI 路径，读取并勾选模型。新建聊天后选 Antigravity 模型，输入 `/` 调用原生 Skill。后续定制版更新请使用 BRAT；下面的社区市场入口安装的是上游原版。
 >

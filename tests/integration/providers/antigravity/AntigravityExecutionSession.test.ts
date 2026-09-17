@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -44,7 +44,15 @@ if (prompt.startsWith('wait')) {
   setInterval(() => {}, 1000);
 }
 else if (prompt.startsWith('denied')) {
-  emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'command',target:'git'}]}});
+  emit({event:'step_update',step_update:{step_index:2,state:'ERROR',step_type:'tool',tool_info:{name:'write_to_file',error:{type:'TOOL_ERROR',message:'permission check failed for write_file'}}}});
+  emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'write_file',display_name:'WriteToFile'}]}});
+} else if (prompt.startsWith('write-in-vault')) {
+  if (a[a.indexOf('--mode') + 1] !== 'accept-edits') {
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'write_file',display_name:'WriteToFile'}]}});
+  } else {
+    require('node:fs').writeFileSync(require('node:path').join(process.cwd(), 'write-proof.txt'), 'VAULT_WRITE_OK');
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'Written'}});
+  }
 } else {
   emit({event:'step_update',step_update:{step_index:1,state:'ACTIVE',step_type:'agent_response',text_delta:'Hello '}});
   emit({event:'step_update',step_update:{step_index:1,state:'DONE',step_type:'agent_response',text_delta:id}});
@@ -77,7 +85,20 @@ else if (prompt.startsWith('denied')) {
     const events = await collect(session.execute(request('denied')).events);
     expect(events.some(e => e.type === 'notice' && /denied/i.test(e.message))).toBe(true);
     expect(events.at(-1)?.type).toBe('execution_error');
+    expect(events).toContainEqual(expect.objectContaining({ type: 'tool_completed', isError: true, content: 'permission check failed for write_file' }));
     await session.dispose();
+  });
+
+  it('allows native file edits in each session vault, including resumed conversations', async () => {
+    const secondVault = await mkdtemp(join(root, 'second-vault-'));
+    for (const vaultWorkingDirectory of [root, secondVault]) {
+      const session = backend.createSession({ ...config('saved-session'), vaultWorkingDirectory });
+      const events = await collect(session.execute(request('write-in-vault')).events);
+      expect(events.at(-1)).toMatchObject({ type: 'turn_completed' });
+      expect(await readFile(join(vaultWorkingDirectory, 'write-proof.txt'), 'utf8')).toBe('VAULT_WRITE_OK');
+      expect(session.getSnapshot().providerSessionId).toBe('saved-session');
+      await session.dispose();
+    }
   });
 
   it('preserves a native startup error when no JSON result is produced', async () => {
