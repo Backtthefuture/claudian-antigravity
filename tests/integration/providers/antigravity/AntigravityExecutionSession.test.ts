@@ -6,6 +6,7 @@ import type { ProviderExecutionEvent, ProviderExecutionRequest, ProviderSessionC
 import { buildSystemPrompt } from '@/core/prompt/mainAgent';
 import type { ProviderHost } from '@/core/providers/ProviderHost';
 import { AntigravityExecutionBackend } from '@/providers/antigravity/AntigravityExecutionBackend';
+import { updateAntigravitySettings } from '@/providers/antigravity/settings';
 
 describe('Antigravity native process boundary', () => {
   let root: string;
@@ -35,7 +36,7 @@ const a = process.argv.slice(2);
 const prompt = a[a.indexOf('-p') + 1];
 const id = a.includes('--conversation') ? a[a.indexOf('--conversation') + 1] : 'new-session';
 const emit = x => process.stdout.write(JSON.stringify(x) + '\\n');
-if (a.includes('--continue') || a.includes('--dangerously-skip-permissions')) process.exit(9);
+if (a.includes('--continue')) process.exit(9);
 if (prompt.startsWith('capture-prompt')) { emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:prompt}}); process.exit(0); }
 if (prompt.startsWith('network-error')) { process.stderr.write('Eligibility check failed: EOF'); process.exit(1); }
 if (prompt.startsWith('rejected')) { emit({event:'result',result:{status:'ERROR',error:'Unknown model'}}); process.exit(1); }
@@ -45,7 +46,14 @@ if (prompt.startsWith('wait')) {
   process.on('SIGTERM', () => { process.stderr.write('error: interrupted'); process.exit(1); });
   setInterval(() => {}, 1000);
 }
-else if (prompt.startsWith('denied')) {
+else if (prompt.startsWith('permission-command')) {
+  if (!a.includes('--dangerously-skip-permissions')) {
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,denied_actions:[{action:'command',display_name:'RunCommand'}]}});
+  } else {
+    require('node:fs').writeFileSync(require('node:path').join(process.cwd(), 'command-proof.txt'), 'COMMAND_APPROVED');
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'COMMAND_APPROVED'}});
+  }
+} else if (prompt.startsWith('denied')) {
   emit({event:'step_update',step_update:{step_index:2,state:'ERROR',step_type:'tool',tool_info:{name:'write_to_file',error:{type:'TOOL_ERROR',message:'permission check failed for write_file'}}}});
   emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'write_file',display_name:'WriteToFile'}]}});
 } else if (prompt.startsWith('read-in-vault')) {
@@ -95,6 +103,47 @@ else if (prompt.startsWith('denied')) {
     expect(events.some(e => e.type === 'notice' && /denied/i.test(e.message))).toBe(true);
     expect(events.at(-1)?.type).toBe('execution_error');
     expect(events).toContainEqual(expect.objectContaining({ type: 'tool_completed', isError: true, content: 'permission check failed for write_file' }));
+    await session.dispose();
+  });
+
+  it('auto-approves commands only after explicit opt-in, including resumed turns', async () => {
+    updateAntigravitySettings(host.settings, { autoApproveAllTools: true });
+    for (const id of [undefined, 'saved-session']) {
+      const session = backend.createSession(config(id));
+      const events = await collect(session.execute(request('permission-command')).events);
+      expect(events.at(-1)).toMatchObject({ type: 'turn_completed' });
+      expect(await readFile(join(root, 'command-proof.txt'), 'utf8')).toBe('COMMAND_APPROVED');
+      expect(session.getSnapshot().providerSessionId).toBe(id ?? 'new-session');
+      await session.dispose();
+    }
+  });
+
+  it.each([undefined, false, 'true', 'false', 1, {}, null])('does not auto-approve malformed or disabled permission settings: %p', async value => {
+    Object.assign(host.settings, { providerConfigs: { antigravity: { autoApproveAllTools: value } } });
+    const session = backend.createSession(config('saved-session'));
+    const events = await collect(session.execute(request('permission-command')).events);
+    expect(events.at(-1)).toMatchObject({ type: 'execution_error' });
+    await expect(readFile(join(root, 'command-proof.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    await session.dispose();
+  });
+
+  it('keeps restrictive auxiliary policies from inheriting full access', async () => {
+    updateAntigravitySettings(host.settings, { autoApproveAllTools: true });
+    const session = backend.createSession(config());
+    const events = await collect(session.execute({ ...request('permission-command'), toolPolicy: { kind: 'read-only' } }).events);
+    expect(events.at(-1)).toMatchObject({ type: 'execution_error' });
+    await expect(readFile(join(root, 'command-proof.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    await session.dispose();
+  });
+
+  it('describes enabled command access in the runtime context', async () => {
+    updateAntigravitySettings(host.settings, { autoApproveAllTools: true });
+    const session = backend.createSession(config());
+    const query = request('capture-prompt');
+    const events = await collect(session.execute({ ...query, configuration: { ...query.configuration, systemInstructions: { kind: 'provider-default' } } }).events);
+    const prompt = events.flatMap(e => e.type === 'text_delta' ? [e.text] : []).join('');
+    expect(prompt).toContain('Full tool access is enabled by the user');
+    expect(prompt).not.toContain('Do not invoke run_command');
     await session.dispose();
   });
 

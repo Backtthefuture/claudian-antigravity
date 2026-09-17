@@ -11,6 +11,7 @@ import { appendLinkedContent } from '@/utils/context';
 import { appendEditorContext } from '@/utils/editor';
 
 import { createAntigravityProcess, record, string } from './AntigravityProcess';
+import { getAntigravitySettings } from './settings';
 
 type EventPayload = ProviderExecutionEvent extends infer E ? E extends ProviderExecutionEvent ? Omit<E, 'scope'> : never : never;
 
@@ -73,6 +74,7 @@ class AntigravityExecutionSession implements ProviderExecutionSession {
       if (!model?.startsWith('antigravity:') || !model.slice(12)) throw new Error('Select an enabled Antigravity model first');
       // In agy 1.2.4, cwd alone does not grant native read access to the vault.
       const args = ['-p', buildPrompt(request, this.host, this.config.vaultWorkingDirectory), '--output-format', 'stream-json', '--model', model.slice(12), '--mode', 'accept-edits', '--add-dir', this.config.vaultWorkingDirectory];
+      if (getAntigravitySettings(this.host.settings).autoApproveAllTools) args.push('--dangerously-skip-permissions');
       if (this.nativeId) args.push('--conversation', this.nativeId);
       active.proc = await createAntigravityProcess(this.host, this.config.vaultWorkingDirectory, args);
       if (request.signal.aborted || active.controller.signal.aborted) throw new Error('Cancelled');
@@ -172,12 +174,16 @@ function buildPrompt(request: ProviderExecutionRequest, host: ProviderHost, vaul
     vaultPath, customPrompt: host.settings.systemPrompt, mediaFolder: host.settings.mediaFolder, userName: host.settings.userName,
   }, { dynamicSections: instructions.dynamicSections ? [...instructions.dynamicSections] : undefined });
   const now = new Date();
+  const permissions = getAntigravitySettings(host.settings).autoApproveAllTools
+    ? `Full tool access is enabled by the user through --dangerously-skip-permissions. Native tool requests, including terminal commands and access outside the vault, are auto-approved. Use run_command when the task requires it, including decoding Excalidraw or running scripts. Prefer native file tools for simple note operations. Execute only operations needed for the user's task and report actual results.`
+    : `Interactive approvals are unavailable; terminal commands require existing native permission rules.
+For ordinary vault note discovery, reading, editing, and wikilink tasks, use native filesystem tools such as list_dir, find_by_name, grep_search, view_file, replace_file_content, multi_replace_file_content, and write_to_file. Do not invoke run_command for these tasks, including preliminary checks with date, ls, pwd, find, grep, or the Obsidian CLI. Use list_dir for directory and file existence checks.
+If a task genuinely requires an unapproved command or live Obsidian operation, explain the required operation and the limitation. Do not bypass a denial or claim the operation succeeded.`;
   const runtime = instructions.kind === 'explicit' ? '' : `\n\n<antigravity_runtime_context>
 Host current time: ${now.toISOString()} (UTC). Host local time: ${now.toString()}.
 Current vault root: ${vaultPath}. For current-vault tasks, resolve note paths inside this directory; do not search the home directory or other repositories for a replacement vault or CLI installation.
-This turn runs through Antigravity headless mode. Interactive approvals are unavailable; terminal commands require existing native permission rules.
-For ordinary vault note discovery, reading, editing, and wikilink tasks, use native filesystem tools such as list_dir, find_by_name, grep_search, view_file, replace_file_content, multi_replace_file_content, and write_to_file. Do not invoke run_command for these tasks, including preliminary checks with date, ls, pwd, find, grep, or the Obsidian CLI. Use list_dir for directory and file existence checks. The host time above is already verified; no clock command is needed.
-If a task genuinely requires an unapproved command or live Obsidian operation, explain the required operation and the limitation. Do not bypass a denial or claim the operation succeeded.
+This turn runs through Antigravity headless mode. The host time above is already verified; no clock command is needed.
+${permissions}
 </antigravity_runtime_context>`;
   return `${text}\n\n<claudian_application_context>\n${system}\n</claudian_application_context>${runtime}`;
 }

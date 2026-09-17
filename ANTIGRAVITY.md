@@ -5,8 +5,8 @@ This fork adds one optional provider to Claudian 2.2.7 (`8fc1f920bf98c39d1c14995
 ## Setup
 
 1. Install and sign in to the official Antigravity CLI. Verify `agy models` and `agy -p /skills --output-format json` in a terminal.
-2. Install BRAT from Obsidian's community plugins. In BRAT, choose **Add a beta plugin**, enter `Backtthefuture/claudian-antigravity`, and select `2.2.7-antigravity.5` or a later verified release. Start with a separate desktop vault. The plugin ID remains `realclaudian`; this updates upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Use this fork's BRAT entry for future updates; community-market updates or a BRAT entry tracking upstream can overwrite the patch.
-3. Open **Claudian → Providers → Antigravity**, enable it, and set the absolute `agy` executable path if discovery cannot find it.
+2. Install BRAT from Obsidian's community plugins. In BRAT, choose **Add a beta plugin**, enter `Backtthefuture/claudian-antigravity`, and select `2.2.7-antigravity.6` or a later verified release. Start with a separate desktop vault. The plugin ID remains `realclaudian`; this updates upstream Claudian in the same vault. Back up the original plugin directory and `.claudian/` before replacing an existing installation. Use this fork's BRAT entry for future updates; community-market updates or a BRAT entry tracking upstream can overwrite the patch.
+3. Open **Claudian → Providers → Antigravity**, enable it, and set the absolute `agy` executable path if discovery cannot find it. **Tool permissions** defaults to **Native permissions**. Choose **Full access (auto-approve all tools)** only when you want agy to approve all tools, including terminal commands and files outside the vault. This applies to both new and resumed chats.
 4. Discover models, then select the models to show in chat. Discovery never enables models automatically. Model aliases and ordering use Claudian's existing controls.
 5. Start a new conversation and choose an Antigravity model. Type `/` to browse native Skills. Use **Escape** in the input to stop a running answer.
 
@@ -27,11 +27,11 @@ The upstream production entry files changed are `src/providers/index.ts` and `sr
 - Each conversation saves its own native ID and resumes using `--conversation ID`. The adapter never uses global `--continue` or guesses the latest CLI session.
 - Text history is stored as a provider-owned display snapshot in Claudian metadata. Native context remains in agy's own session. The patch does not read, modify, or delete private agy databases. Detailed tool cards are not reconstructed after reloading, and an existing CLI conversation cannot be imported through the history UI.
 - agy 1.2.4 has no documented system-prompt override flag. Complete Claudian instructions are appended as labeled application context after the user input, preserving native slash invocation. This is not a system-role override.
-- Provider-default turns include fresh host time and headless capability context. Note discovery and wikilink edits use native file/search tools instead of requiring `date`, `ls`, or the Obsidian CLI. This is model guidance, not a command sandbox or approval bridge; tasks that actually need unapproved terminal commands remain subject to native denial.
-- Chat turns use native `--mode accept-edits` with the current vault as both the working directory and an explicit `--add-dir` workspace, including resumed conversations. agy 1.2.4 does not grant native reads from cwd alone. Together these options let each vault read, create and edit its own files without an unavailable interactive diff review. Native permission rules still apply to commands and access outside the vault. The provider does not pass `--dangerously-skip-permissions` or modify global CLI permission settings. Explicit native permission restrictions can still block an operation.
+- Provider-default turns include fresh host time and permission-aware headless context. Simple note discovery and wikilink edits prefer native file/search tools. With full access enabled, task-required commands such as decoding Excalidraw are available. Prompt guidance alone never grants permissions.
+- Chat turns use native `--mode accept-edits` with the current vault as both the working directory and an explicit `--add-dir` workspace, including resumed conversations. agy 1.2.4 does not grant native reads from cwd alone. In the default **Native permissions** mode, CLI permission rules still apply to commands and access outside the vault. Explicit native permission restrictions can still block an operation. The optional **Full access** setting adds the native `--dangerously-skip-permissions` flag to every chat turn. It is enabled only when the persisted provider field `autoApproveAllTools` is the boolean `true`; missing or malformed values retain native rules. Neither mode modifies global CLI settings. Metadata discovery and restricted auxiliary tasks do not inherit full access.
 - Interactive approval dialogs, image attachments, forks, rewind, steering, native usage accounting, and inline edit are outside this preview. Restricted auxiliary tool policies are rejected rather than silently weakened. Automatic title generation through Antigravity is therefore unavailable; disable it or use a supported provider.
 - Native Skills remain read-only in Claudian. The first discovery starts `agy /skills`; subsequent chats share its cached names/descriptions. `.claudian/cache/antigravity-skills.json` restores that catalog across plugin restarts, scoped to the host, vault and configured CLI environment. Startup uses the last valid list while revalidating in the background. Later chat discovery revalidates at most once every five minutes; after a refresh, reopen a chat to pick up changed Skills. Failed refreshes keep the previous list, and invalid caches fall back to native discovery. Actual slash invocation always goes to agy, never to cached Skill contents. No global Skill links or CLI permissions are modified by installation.
-- Verified on macOS with Obsidian 1.13.7 and agy 1.2.4. Windows/Linux are not manually verified.
+- Verified on macOS with Obsidian 1.13.7 and agy 1.2.5. Windows/Linux are not manually verified.
 
 ## Checks
 
@@ -87,6 +87,16 @@ npm run test:unit -- --runInBand tests/integration/providers/antigravity/Antigra
 ```
 
 Set `CLAUDIAN_AGY_LINK_EVIDENCE` to an optional JSON output path for the native tool events and final note.
+
+The opt-in full-access test first reproduces a denied command under native permissions, then resumes that same native conversation with explicit full access. It decodes a compressed Excalidraw fixture through `run_command`, verifies the decoded text and two arrows, and checks native reads and writes outside its temporary vault. It removes only its own temporary files and leaves global CLI permission settings unchanged:
+
+```bash
+CLAUDIAN_AGY_LIVE_FULL_ACCESS_TEST=1 \
+CLAUDIAN_AGY_TEST_CLI=/absolute/path/to/agy \
+npm run test:unit -- --runInBand tests/integration/providers/antigravity/AntigravityFullAccessLive.test.ts
+```
+
+Set `CLAUDIAN_AGY_FULL_ACCESS_EVIDENCE` to an optional JSON evidence path. `CLAUDIAN_AGY_EXCALIDRAW_SOURCE` optionally supplies a drawing to copy into the fixture; the expected scene contains the text `欢迎来到AgentWork` and two arrows. The original drawing is never modified.
 
 ## Upstream updates
 

@@ -6,6 +6,7 @@ import { record, string } from './AntigravityProcess';
 
 export interface AntigravitySettings {
   enabled: boolean;
+  autoApproveAllTools: boolean;
   cliPath: string;
   environmentHash: string;
   environmentVariables: string;
@@ -19,6 +20,7 @@ export function getAntigravitySettings(settings: Record<string, unknown>): Antig
   const config = getProviderConfig(settings, 'antigravity');
   return {
     enabled: config.enabled === true,
+    autoApproveAllTools: config.autoApproveAllTools === true,
     cliPath: string(config.cliPath),
     environmentHash: string(config.environmentHash),
     environmentVariables: string(config.environmentVariables),

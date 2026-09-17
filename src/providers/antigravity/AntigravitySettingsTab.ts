@@ -8,13 +8,14 @@ import { renderHostnameCliPathSetting } from '@/shared/settings/HostnameCliPathS
 import { renderProviderModelPicker } from '@/shared/settings/ProviderModelPicker';
 import { getHostnameKey } from '@/utils/env';
 
+import { renderAntigravityPermissionSetting } from './AntigravityPermissionSettings';
 import { getAntigravitySettings, updateAntigravitySettings } from './settings';
 
 export const antigravitySettingsTab: ProviderSettingsTabRenderer = {
   render(container, context) {
     const host = context.plugin;
     const settings = () => getAntigravitySettings(host.settings);
-    new Setting(container).setName('Antigravity').setDesc('Uses your installed and authenticated agy CLI in accept-edits mode for the current vault. Native rules still govern commands and access outside the vault; interactive approvals are unavailable in headless mode.').addToggle(toggle => toggle.setValue(settings().enabled).onChange(async value => {
+    new Setting(container).setName('Antigravity').setDesc('Uses your installed and authenticated agy CLI for the current vault. Choose how tool permissions are handled below.').addToggle(toggle => toggle.setValue(settings().enabled).onChange(async value => {
       if (!ProviderSettingsCoordinator.canApplyProviderEnablement(host.settings, 'antigravity', value)) {
         toggle.setValue(settings().enabled);
         new Notice('Keep at least one provider enabled.');
@@ -25,6 +26,7 @@ export const antigravitySettingsTab: ProviderSettingsTabRenderer = {
       });
       context.notifyProviderModelOptionsChanged('antigravity');
     }));
+    renderAntigravityPermissionSetting(container, host);
     renderHostnameCliPathSetting({
       container, name: 'CLI path', description: 'Absolute path to agy on this computer. Leave empty to discover it on PATH.', placeholder: '/path/to/agy',
       getValue: () => settings().cliPathsByHost[getHostnameKey()] || '',
