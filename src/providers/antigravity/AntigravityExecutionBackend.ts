@@ -71,7 +71,8 @@ class AntigravityExecutionSession implements ProviderExecutionSession {
       if (request.input.some(block => block.type === 'image')) throw new Error('Antigravity image attachments are not supported');
       const model = request.configuration.model;
       if (!model?.startsWith('antigravity:') || !model.slice(12)) throw new Error('Select an enabled Antigravity model first');
-      const args = ['-p', buildPrompt(request, this.host, this.config.vaultWorkingDirectory), '--output-format', 'stream-json', '--model', model.slice(12), '--mode', 'accept-edits'];
+      // In agy 1.2.4, cwd alone does not grant native read access to the vault.
+      const args = ['-p', buildPrompt(request, this.host, this.config.vaultWorkingDirectory), '--output-format', 'stream-json', '--model', model.slice(12), '--mode', 'accept-edits', '--add-dir', this.config.vaultWorkingDirectory];
       if (this.nativeId) args.push('--conversation', this.nativeId);
       active.proc = await createAntigravityProcess(this.host, this.config.vaultWorkingDirectory, args);
       if (request.signal.aborted || active.controller.signal.aborted) throw new Error('Cancelled');

@@ -46,6 +46,13 @@ if (prompt.startsWith('wait')) {
 else if (prompt.startsWith('denied')) {
   emit({event:'step_update',step_update:{step_index:2,state:'ERROR',step_type:'tool',tool_info:{name:'write_to_file',error:{type:'TOOL_ERROR',message:'permission check failed for write_file'}}}});
   emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'write_file',display_name:'WriteToFile'}]}});
+} else if (prompt.startsWith('read-in-vault')) {
+  if (!a.includes('--add-dir') || require('node:fs').realpathSync(a[a.indexOf('--add-dir') + 1]) !== process.cwd()) {
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'read_file',display_name:'ViewFile'}]}});
+  } else {
+    const response = require('node:fs').readFileSync(require('node:path').join(process.cwd(), 'read-proof.txt'), 'utf8');
+    emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response}});
+  }
 } else if (prompt.startsWith('write-in-vault')) {
   if (a[a.indexOf('--mode') + 1] !== 'accept-edits') {
     emit({event:'result',result:{status:'SUCCESS',conversation_id:id,response:'',denied_actions:[{action:'write_file',display_name:'WriteToFile'}]}});
@@ -98,6 +105,21 @@ else if (prompt.startsWith('denied')) {
       expect(await readFile(join(vaultWorkingDirectory, 'write-proof.txt'), 'utf8')).toBe('VAULT_WRITE_OK');
       expect(session.getSnapshot().providerSessionId).toBe('saved-session');
       await session.dispose();
+    }
+  });
+
+  it('reads each explicitly registered vault in fresh and restored native conversations', async () => {
+    const secondVault = await mkdtemp(join(root, 'second-vault-'));
+    for (const [index, vaultWorkingDirectory] of [root, secondVault].entries()) {
+      await writeFile(join(vaultWorkingDirectory, 'read-proof.txt'), `VAULT_READ_${index}`);
+      for (const id of [undefined, 'saved-session']) {
+        const session = backend.createSession({ ...config(id), vaultWorkingDirectory });
+        const events = await collect(session.execute(request('read-in-vault')).events);
+        expect(events.at(-1)).toMatchObject({ type: 'turn_completed' });
+        expect(events.flatMap(e => e.type === 'text_delta' ? [e.text] : []).join('')).toBe(`VAULT_READ_${index}`);
+        expect(session.getSnapshot().providerSessionId).toBe(id ?? 'new-session');
+        await session.dispose();
+      }
     }
   });
 

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { ProviderExecutionEvent, ProviderExecutionSession, ProviderSessionConfig } from '@/core/execution';
@@ -8,7 +9,7 @@ import { AntigravityExecutionBackend } from '@/providers/antigravity/Antigravity
 const live = process.env.CLAUDIAN_AGY_LIVE_WRITE_TEST === '1' ? describe : describe.skip;
 
 live('Antigravity live file permissions', () => {
-  it('creates and edits files in two vaults while retaining outside-file and command permissions', async () => {
+  it('reads, creates and edits files in two vaults while retaining outside-file and command permissions', async () => {
     const parent = process.env.CLAUDIAN_AGY_TEST_VAULT;
     const cli = process.env.CLAUDIAN_AGY_TEST_CLI;
     if (!parent || !cli) throw new Error('Set an isolated CLAUDIAN_AGY_TEST_VAULT and CLAUDIAN_AGY_TEST_CLI');
@@ -51,6 +52,16 @@ live('Antigravity live file permissions', () => {
         await mkdir(vault);
         const target = join(vault, 'proof.txt');
         const session = createSession(vault);
+        const readTarget = join(vault, 'read-proof.txt');
+        const assertRead = async (reader: ProviderExecutionSession) => {
+          const marker = randomUUID();
+          await writeFile(readTarget, marker);
+          const reads = await run(reader, `Use view_file to read exactly ${readTarget} and return its exact text. No shell commands, other tools or other files. Stop if denied.`);
+          expect(reads.at(-1)).toMatchObject({ type: 'turn_completed' });
+          expect(reads).toContainEqual(expect.objectContaining({ type: 'tool_started', name: 'view_file' }));
+          expect(reads.flatMap(e => e.type === 'text_delta' ? [e.text] : []).join('')).toContain(marker);
+        };
+        await assertRead(session);
         const events = await run(session, `Use write_to_file to create exactly ${target} with text VAULT_CREATED. No shell commands. Reply DONE after writing.`);
         expect(events.at(-1)).toMatchObject({ type: 'turn_completed' });
         expect((await readFile(target, 'utf8')).trim()).toBe('VAULT_CREATED');
@@ -59,6 +70,7 @@ live('Antigravity live file permissions', () => {
         ids.push(id!);
         await session.dispose();
         const resumed = createSession(vault, id);
+        await assertRead(resumed);
         const editEvents = await run(resumed, `Use replace_file_content to replace VAULT_CREATED with VAULT_EDITED in exactly ${target}. No shell commands. Reply DONE after editing.`);
         expect(editEvents.at(-1)).toMatchObject({ type: 'turn_completed' });
         expect((await readFile(target, 'utf8')).trim()).toBe('VAULT_EDITED');
@@ -71,6 +83,12 @@ live('Antigravity live file permissions', () => {
       expect(denied.at(-1)).toMatchObject({ type: 'execution_error' });
       expect(denied).toContainEqual(expect.objectContaining({ type: 'tool_completed', isError: true }));
       await expect(readFile(outside, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+
+      const outsideRead = join(root, 'outside-read.txt');
+      await writeFile(outsideRead, randomUUID());
+      const readDenied = await run(createSession(join(root, 'vault-b')), `Use view_file to read exactly ${outsideRead}. Do not use another location or another tool. Stop if denied.`);
+      expect(readDenied.at(-1)).toMatchObject({ type: 'execution_error' });
+      expect(readDenied).toContainEqual(expect.objectContaining({ type: 'notice', message: expect.stringContaining('read_file') }));
 
       const command = await run(createSession(join(root, 'vault-b')), 'Use run_command to execute exactly: printf CLAUDIAN_COMMAND_PROBE. Do not use another tool or change any files. Stop if denied.');
       expect(command.at(-1)).toMatchObject({ type: 'execution_error' });
