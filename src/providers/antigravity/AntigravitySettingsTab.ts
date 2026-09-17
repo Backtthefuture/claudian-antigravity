@@ -61,7 +61,7 @@ export const antigravitySettingsTab: ProviderSettingsTabRenderer = {
         context.notifyProviderModelOptionsChanged('antigravity');
       },
     });
-    new Setting(container).setName('Skills').setDesc('The / menu reads the native agy /skills catalog, including project skills and symlinks. Edit skills in their source folders. Reopen the chat to refresh discovery.');
+    new Setting(container).setName('Skills').setDesc('The / menu caches native skill names across chats and restarts, including project skills and symlinks. The first discovery still starts agy; cached lists appear immediately while updates load in the background. Edit skills in their source folders. Reopen a chat after a background refresh to see changes.');
     context.renderHiddenProviderCommandSetting(container, 'antigravity', { name: 'Hidden Skills', desc: 'Hide selected Skills from the slash menu.', placeholder: 'skill-name' });
     renderEnvironmentSettingsSection({ container, plugin: host, scope: 'provider:antigravity', name: 'Environment variables', desc: 'Environment for agy subprocesses, including proxy settings when needed.', placeholder: 'HTTPS_PROXY=http://127.0.0.1:7897' });
   },
